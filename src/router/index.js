@@ -1,13 +1,13 @@
 import Vue from 'vue'
 import VueRouter from 'vue-router'
-import Stream from '../views/Stream.vue'
+import Streamer from '../views/Streamer.vue'
 
 Vue.use(VueRouter);
 
 const routes = [{
     path: '/',
-    name: 'Stream',
-    component: Stream
+    name: 'Streamer',
+    component: Streamer
   },
   {
     path: '/about',
