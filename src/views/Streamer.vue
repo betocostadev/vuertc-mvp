@@ -2,7 +2,7 @@
   <div class="streamer">
     <h1>Vue WebRTC - Streaming test</h1>
     <div class="userChoices">
-      <input type="hidden" id="userAgent" name="userAgent" value="" />
+      <input type="hidden" id="userAgent" name="userAgent" value />
 
       <div>
         <label for="sdpURL">WS (SDP) URL:</label>
@@ -11,65 +11,38 @@
 
       <div>
         <label for="applicationName">Application name:</label>
-        <input
-          type="text"
-          id="applicationName"
-          size="25"
-          v-model="streamInfo.applicationName"
-        />
+        <input type="text" id="applicationName" size="25" v-model="streamInfo.applicationName" />
       </div>
 
       <div>
         <label for="streamName">Stream name:</label>
-        <input
-          type="text"
-          id="streamName"
-          size="25"
-          v-model="streamInfo.streamName"
-        />
+        <input type="text" id="streamName" size="25" v-model="streamInfo.streamName" />
       </div>
 
       <div>
         <label for="videoBitrate">Video Bitrate:</label>
-        <input
-          type="text"
-          id="videoBitrate"
-          size="10"
-          v-model="videoSettings.videoBitrate"
-        />
+        <input type="text" id="videoBitrate" size="10" v-model="videoSettings.videoBitrate" />
       </div>
 
       <div>
         <label for="audioBitrate">Audio Bitrate:</label>
-        <input
-          type="text"
-          id="audioBitrate"
-          size="10"
-          v-model="audioSettings.audioBitrate"
-        />
+        <input type="text" id="audioBitrate" size="10" v-model="audioSettings.audioBitrate" />
       </div>
 
       <div>
         <label for="videoFrameRate">Video frame rate:</label>
-        <input
-          type="text"
-          id="videoFrameRate"
-          size="10"
-          v-model="videoSettings.videoFrameRate"
-        />
+        <input type="text" id="videoFrameRate" size="10" v-model="videoSettings.videoFrameRate" />
       </div>
 
       <div>
-        <label for="videoChoice">Video choice: </label>
+        <label for="videoChoice">Video choice:</label>
         <select name="videoChoice" id="videoChoice">
-          <option :value="videoSettings.videoChoice" selected="selected"
-            >H264</option
-          >
+          <option :value="videoSettings.videoChoice" selected="selected">H264</option>
         </select>
       </div>
 
       <div>
-        <label for="audioChoice">Audio choice: </label>
+        <label for="audioChoice">Audio choice:</label>
         <select type="text" id="audioChoice">
           <option :value="audioSettings.audioChoice">Opus</option>
         </select>
@@ -78,15 +51,13 @@
 
     <div class="buttons">
       <button @click="startCapture">Start capture device</button>
-      <button v-show="localStream" @click="startStream">
-        Start stream
-      </button>
+      <button v-show="localStream" @click="startStream">Start stream</button>
     </div>
 
     <div class="status">
       <p>Capture device: {{ device }}</p>
-      <span v-if="!hasMediaDevice">Media device: off | </span>
-      <span v-else>Media device: on | </span>
+      <span v-if="!hasMediaDevice">Media device: off |</span>
+      <span v-else>Media device: on |</span>
       <span v-if="!isLocalVideoPlaying">Local video: off</span>
       <span v-else>Local video: on</span>
     </div>
@@ -199,9 +170,49 @@ export default {
       }
     },
 
-    startStream() {
-      this.wsConnect()
+    startPublisher() {
+      this.wsURL = this.wsURL
+      this.streamInfo.applicationName = this.streamInfo.applicationName
+      this.streamInfo.streamName = this.streamInfo.streamName
+      this.videoBitrate = this.videoSettings.videoBitrate
+      this.audioBitrate = this.audioSettings.audioBitrate
+      this.videoFrameRate = this.videoSettings.videoFrameRate
+      this.userAgent = this.userAgent
+      this.videoChoice = this.videoSettings.videoChoice
+      this.audioChoice = this.audioSettings.audioChoice
+      console.log('From startPublisher ', this.wsURL)
+
+      console.log(
+        'startPublisher: wsURL:' +
+          this.wsURL +
+          ' streamInfo:' +
+          JSON.stringify(this.streamInfo)
+      )
+
+      this.wsConnect(this.wsURL)
+
+      // $("#buttonGo").attr('value', GO_BUTTON_STOP);
     },
+
+    stopPublisher() {
+      if (this.peerConnection != null) this.peerConnection.close()
+      this.peerConnection = null
+
+      if (this.wsConnection != null) this.wsConnection.close()
+      this.wsConnection = null
+
+      // $("#buttonGo").attr('value', GO_BUTTON_START);
+
+      console.log('stopPublisher')
+    },
+
+    startStream() {
+      if (this.peerConnection == null) this.startPublisher()
+      else this.stopPublisher()
+    },
+    // startStream() {
+    //   this.wsConnect()
+    // },
 
     wsConnect(url) {
       this.wsConnection = new WebSocket(this.wsURL)
@@ -238,7 +249,7 @@ export default {
 
         if (msgStatus != 200) {
           this.elementText.sdpDataTag = msgJSON['statusDescription']
-          stopPublisher()
+          this.stopPublisher()
         } else {
           this.elementText.sdpDataTag = ''
 
@@ -276,9 +287,13 @@ export default {
 
         this.elementText.sdpDataTag =
           'WebSocket connection failed: ' + this.wsURL
-        stopPublisher()
+        this.stopPublisher()
       }
     }
+  },
+
+  errorHandler(error) {
+    console.log(error)
   },
 
   mounted() {
@@ -306,26 +321,27 @@ export default {
 </script>
 
 <style lang="stylus">
-
 .buttons {
   button {
-    margin 0.25rem
+    margin: 0.25rem;
   }
 }
+
 img, video {
-  max-width 100%
+  max-width: 100%;
 }
 
 .video-container {
-  margin 2rem auto
+  margin: 2rem auto;
 }
 
 .userChoices {
-  margin 1rem
-  text-align left
+  margin: 1rem;
+  text-align: left;
+
   label {
-    font-weight bold
-    padding 1rem
+    font-weight: bold;
+    padding: 1rem;
   }
 }
 </style>
