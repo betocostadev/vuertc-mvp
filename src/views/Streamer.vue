@@ -9,33 +9,60 @@
 
       <div>
         <label for="applicationName">Application name:</label>
-        <input type="text" id="applicationName" size="25" v-model="streamInfo.applicationName" />
+        <input
+          type="text"
+          id="applicationName"
+          size="25"
+          v-model="streamInfo.applicationName"
+        />
       </div>
 
       <div>
         <label for="streamName">Stream name:</label>
-        <input type="text" id="streamName" size="25" v-model="streamInfo.streamName" />
+        <input
+          type="text"
+          id="streamName"
+          size="25"
+          v-model="streamInfo.streamName"
+        />
       </div>
 
       <div>
         <label for="videoBitrate">Video Bitrate:</label>
-        <input type="text" id="videoBitrate" size="10" v-model="videoSettings.videoBitrate" />
+        <input
+          type="text"
+          id="videoBitrate"
+          size="10"
+          v-model="videoSettings.videoBitrate"
+        />
       </div>
 
       <div>
         <label for="audioBitrate">Audio Bitrate:</label>
-        <input type="text" id="audioBitrate" size="10" v-model="audioSettings.audioBitrate" />
+        <input
+          type="text"
+          id="audioBitrate"
+          size="10"
+          v-model="audioSettings.audioBitrate"
+        />
       </div>
 
       <div>
         <label for="videoFrameRate">Video frame rate:</label>
-        <input type="text" id="videoFrameRate" size="10" v-model="videoSettings.videoFrameRate" />
+        <input
+          type="text"
+          id="videoFrameRate"
+          size="10"
+          v-model="videoSettings.videoFrameRate"
+        />
       </div>
 
       <div>
         <label for="videoChoice">Video choice:</label>
         <select name="videoChoice" id="videoChoice">
-          <option :value="videoSettings.videoChoice" selected="selected">H264</option>
+          <option :value="videoSettings.videoChoice" selected="selected"
+            >H264</option
+          >
         </select>
       </div>
 
@@ -69,7 +96,9 @@
         muted
         controls
         :style="videoWidth"
-      >{{device}}</video>
+      >
+        {{ device }}
+      </video>
     </section>
 
     <div>
@@ -89,7 +118,7 @@ export default {
       elementText: {
         sdpDataTag: null
       },
-      videoWidth: 'width: 720px',
+      videoWidth: 'width: 480px',
       isLocalVideoPlaying: false,
       hasMediaDevice: false,
       device: null,
@@ -211,9 +240,7 @@ export default {
         let msgJSON = JSON.parse(evt.data)
 
         let msgStatus = Number(msgJSON['status'])
-        console.log('MsgJSON: ', msgStatus)
         let msgCommand = msgJSON['command']
-        console.log('MsgJSON command: ', msgCommand)
 
         if (msgStatus != 200) {
           this.elementText.sdpDataTag = msgJSON['statusDescription']
