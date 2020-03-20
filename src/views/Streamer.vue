@@ -104,8 +104,8 @@ export default {
       wsURL: 'wss://0afcf2.entrypoint.cloud.wowza.com/webrtc-session.json',
       wsConnection: null,
       streamInfo: {
-        applicationName: 'webrtc',
-        streamName: 'myStream',
+        applicationName: 'app-7e04',
+        streamName: 'Skkvai9K',
         sessionId: '[empty]'
       },
       userData: {
@@ -222,7 +222,7 @@ export default {
         console.log('wsConnection.onopen')
 
         this.peerConnection = new RTCPeerConnection(this.peerConnectionConfig)
-        this.peerConnection.onicecandidate = gotIceCandidate
+        this.peerConnection.onicecandidate = this.gotIceCandidate
 
         if (this.newAPI) {
           let localTracks = this.localStream.getTracks()
@@ -235,9 +235,18 @@ export default {
 
         this.peerConnection
           .createOffer()
-          .then(gotDescription)
-          .catch(errorHandler)
+          .then(this.gotDescription)
+          .catch(this.errorHandler)
       }
+
+      // var offerOptions = {
+      // New spec states offerToReceiveAudio/Video are of type long (due to
+      // having to tell how many "m" lines to generate).
+      // http://w3c.github.io/webrtc-pc/#idl-def-RTCOfferAnswerOptions.
+      //  offerToReceiveAudio: 1,
+      // offerToReceiveVideo: 1,
+      //	codecPayloadType: 0x42E01F,
+      // }
 
       this.wsConnection.onmessage = evt => {
         console.log('wsConnection.onmessage: ' + evt.data)
@@ -289,11 +298,311 @@ export default {
           'WebSocket connection failed: ' + this.wsURL
         this.stopPublisher()
       }
-    }
-  },
+    },
 
-  errorHandler(error) {
-    console.log(error)
+    addAudio(sdpStr, audioLine) {
+      let sdpLines = sdpStr.split(/\r\n/)
+      let sdpSection = 'header'
+      let hitMID = false
+      let sdpStrRet = ''
+      let done = false
+
+      for (let sdpLine of sdpLines) {
+        if (sdpLine.length <= 0) continue
+
+        sdpStrRet += sdpLine
+        sdpStrRet += '\r\n'
+
+        if ('a=rtcp-mux'.localeCompare(sdpLine) == 0 && done == false) {
+          sdpStrRet += audioLine
+          done = true
+        }
+      }
+      return sdpStrRet
+    },
+
+    addVideo(sdpStr, videoLine) {
+      let sdpLines = sdpStr.split(/\r\n/)
+      let sdpSection = 'header'
+      let hitMID = false
+      let sdpStrRet = ''
+      let done = false
+
+      let rtcpSize = false
+      let rtcpMux = false
+
+      for (let sdpLine of sdpLines) {
+        if (sdpLine.length <= 0) continue
+
+        if (sdpLine.includes('a=rtcp-rsize')) {
+          rtcpSize = true
+        }
+
+        if (sdpLine.includes('a=rtcp-mux')) {
+          rtcpMux = true
+        }
+      }
+
+      for (let sdpLine of sdpLines) {
+        sdpStrRet += sdpLine
+        sdpStrRet += '\r\n'
+
+        if (
+          'a=rtcp-rsize'.localeCompare(sdpLine) == 0 &&
+          done == false &&
+          rtcpSize == true
+        ) {
+          sdpStrRet += videoLine
+          done = true
+        }
+
+        if (
+          'a=rtcp-mux'.localeCompare(sdpLine) == 0 &&
+          done == true &&
+          rtcpSize == false
+        ) {
+          sdpStrRet += videoLine
+          done = true
+        }
+
+        if (
+          'a=rtcp-mux'.localeCompare(sdpLine) == 0 &&
+          done == false &&
+          rtcpSize == false
+        ) {
+          done = true
+        }
+      }
+      return sdpStrRet
+    },
+
+    gotIceCandidate(event) {
+      if (event.candidate != null) {
+        console.log(
+          'gotIceCandidate: ' +
+            JSON.stringify({
+              ice: event.candidate
+            })
+        )
+      }
+    },
+
+    gotDescription(description) {
+      let enhanceData = new Object()
+
+      if (audioBitrate !== undefined)
+        enhanceData.audioBitrate = Number(this.audioSettings.audioBitrate)
+      if (videoBitrate !== undefined)
+        enhanceData.videoBitrate = Number(this.videoSettings.videoBitrate)
+      if (videoFrameRate !== undefined)
+        enhanceData.videoFrameRate = Number(this.videoSettings.videoFrameRate)
+
+      description.sdp = this.enhanceSDP(description.sdp, enhanceData)
+
+      console.log(
+        'gotDescription: ' +
+          JSON.stringify({
+            sdp: description
+          })
+      )
+
+      return peerConnection
+        .setLocalDescription(description)
+        .then(() => {
+          this.wsConnection.send(
+            '{"direction":"publish", "command":"sendOffer", "streamInfo":' +
+              JSON.stringify(streamInfo) +
+              ', "sdp":' +
+              JSON.stringify(description) +
+              ', "userData":' +
+              JSON.stringify(userData) +
+              '}'
+          )
+        })
+        .catch(err => {
+          console.log('Set local description error:')
+          console.log(err)
+        })
+    },
+
+    enhanceSDP(sdpStr, enhanceData) {
+      let sdpLines = sdpStr.split(/\r\n/)
+      let sdpSection = 'header'
+      let hitMID = false
+      let sdpStrRet = ''
+
+      //console.log("Original SDP: "+sdpStr)
+
+      // Firefox provides a reasonable SDP, Chrome is just odd
+      // so we have to doing a little mundging to make it all work
+      if (
+        !sdpStr.includes('THIS_IS_SDPARTA') ||
+        this.videoSettings.videoChoice.includes('VP9')
+      ) {
+        for (let sdpLine of sdpLines) {
+          if (sdpLine.length <= 0) continue
+
+          let doneCheck = this.checkLine(sdpLine)
+          if (!doneCheck) continue
+
+          sdpStrRet += sdpLine
+          sdpStrRet += '\r\n'
+        }
+        sdpStrRet = this.addAudio(
+          sdpStrRet,
+          deliverCheckLine(this.audioSettings.audioChoice, 'audio')
+        )
+        sdpStrRet = this.addVideo(
+          sdpStrRet,
+          deliverCheckLine(this.videoSettings.videoChoice, 'video')
+        )
+        sdpStr = sdpStrRet
+        sdpLines = sdpStr.split(/\r\n/)
+        sdpStrRet = ''
+      }
+
+      for (let sdpLine of sdpLines) {
+        if (sdpLine.length <= 0) continue
+
+        if (sdpLine.indexOf('m=audio') == 0 && audioIndex != -1) {
+          audioMLines = sdpLine.split(' ')
+          sdpStrRet +=
+            audioMLines[0] +
+            ' ' +
+            audioMLines[1] +
+            ' ' +
+            audioMLines[2] +
+            ' ' +
+            audioIndex
+        } else if (sdpLine.indexOf('m=video') == 0 && videoIndex != -1) {
+          audioMLines = sdpLine.split(' ')
+          sdpStrRet +=
+            audioMLines[0] +
+            ' ' +
+            audioMLines[1] +
+            ' ' +
+            audioMLines[2] +
+            ' ' +
+            videoIndex
+        } else {
+          sdpStrRet += sdpLine
+        }
+
+        if (sdpLine.indexOf('m=audio') === 0) {
+          sdpSection = 'audio'
+          hitMID = false
+        } else if (sdpLine.indexOf('m=video') === 0) {
+          sdpSection = 'video'
+          hitMID = false
+        } else if (sdpLine.indexOf('a=rtpmap') == 0) {
+          sdpSection = 'bandwidth'
+          hitMID = false
+        }
+
+        if (
+          sdpLine.indexOf('a=mid:') === 0 ||
+          sdpLine.indexOf('a=rtpmap') == 0
+        ) {
+          if (!hitMID) {
+            if ('audio'.localeCompare(sdpSection) == 0) {
+              if (enhanceData.audioBitrate !== undefined) {
+                sdpStrRet += '\r\nb=CT:' + enhanceData.audioBitrate
+                sdpStrRet += '\r\nb=AS:' + enhanceData.audioBitrate
+              }
+              hitMID = true
+            } else if ('video'.localeCompare(sdpSection) == 0) {
+              if (enhanceData.videoBitrate !== undefined) {
+                sdpStrRet += '\r\nb=CT:' + enhanceData.videoBitrate
+                sdpStrRet += '\r\nb=AS:' + enhanceData.videoBitrate
+                if (enhanceData.videoFrameRate !== undefined) {
+                  sdpStrRet += '\r\na=framerate:' + enhanceData.videoFrameRate
+                }
+              }
+              hitMID = true
+            } else if ('bandwidth'.localeCompare(sdpSection) == 0) {
+              var rtpmapID
+              rtpmapID = getrtpMapID(sdpLine)
+              if (rtpmapID !== null) {
+                var match = rtpmapID[2].toLowerCase()
+                if (
+                  'vp9'.localeCompare(match) == 0 ||
+                  'vp8'.localeCompare(match) == 0 ||
+                  'h264'.localeCompare(match) == 0 ||
+                  'red'.localeCompare(match) == 0 ||
+                  'ulpfec'.localeCompare(match) == 0 ||
+                  'rtx'.localeCompare(match) == 0
+                ) {
+                  if (enhanceData.videoBitrate !== undefined) {
+                    sdpStrRet +=
+                      '\r\na=fmtp:' +
+                      rtpmapID[1] +
+                      ' x-google-min-bitrate=' +
+                      enhanceData.videoBitrate +
+                      ';x-google-max-bitrate=' +
+                      enhanceData.videoBitrate
+                  }
+                }
+
+                if (
+                  'opus'.localeCompare(match) == 0 ||
+                  'isac'.localeCompare(match) == 0 ||
+                  'g722'.localeCompare(match) == 0 ||
+                  'pcmu'.localeCompare(match) == 0 ||
+                  'pcma'.localeCompare(match) == 0 ||
+                  'cn'.localeCompare(match) == 0
+                ) {
+                  if (enhanceData.audioBitrate !== undefined) {
+                    sdpStrRet +=
+                      '\r\na=fmtp:' +
+                      rtpmapID[1] +
+                      ' x-google-min-bitrate=' +
+                      enhanceData.audioBitrate +
+                      ';x-google-max-bitrate=' +
+                      enhanceData.audioBitrate
+                  }
+                }
+              }
+            }
+          }
+        }
+        sdpStrRet += '\r\n'
+      }
+      console.log('Resulting SDP: ' + sdpStrRet)
+      return sdpStrRet
+    },
+
+    // Perform checkings for the SDP protocol
+    // map from an RTP payload type number to a media encoding name that identifies the payload format
+    checkLine(line) {
+      if (
+        line.startsWith('a=rtpmap') ||
+        line.startsWith('a=rtcp-fb') ||
+        line.startsWith('a=fmtp')
+      ) {
+        let res = line.split(':')
+
+        if (res.length > 1) {
+          let number = res[1].split(' ')
+          if (!isNaN(number[0])) {
+            if (!number[1].startsWith('http') && !number[1].startsWith('ur')) {
+              let currentString = SDPOutput[number[0]]
+              if (!currentString) {
+                currentString = ''
+              }
+              currentString += line + '\r\n'
+              SDPOutput[number[0]] = currentString
+              return false
+            }
+          }
+        }
+      }
+
+      return true
+    },
+
+    errorHandler(error) {
+      console.log(error)
+    }
   },
 
   mounted() {
