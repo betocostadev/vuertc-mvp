@@ -2,8 +2,6 @@
   <div class="streamer">
     <h1>Vue WebRTC - Streaming test</h1>
     <div class="userChoices">
-      <input type="hidden" id="userAgent" name="userAgent" value />
-
       <div>
         <label for="sdpURL">WS (SDP) URL:</label>
         <input type="text" id="sdpURL" size="50" v-model="wsURL" />
@@ -71,7 +69,7 @@
         muted
         controls
         :style="videoWidth"
-      ></video>
+      >{{device}}</video>
     </section>
 
     <div>
@@ -130,7 +128,10 @@ export default {
   components: {},
   methods: {
     startCapture() {
+      this.userAgent = navigator.userAgent.toLowerCase()
+
       const openMediaDevices = async constraints => {
+        // constraints: data that will be sent ({ video, audio })
         return await navigator.mediaDevices.getUserMedia(constraints)
       }
       try {
@@ -169,50 +170,6 @@ export default {
         console.error('Error opening capture device.', error)
       }
     },
-
-    startPublisher() {
-      this.wsURL = this.wsURL
-      this.streamInfo.applicationName = this.streamInfo.applicationName
-      this.streamInfo.streamName = this.streamInfo.streamName
-      this.videoBitrate = this.videoSettings.videoBitrate
-      this.audioBitrate = this.audioSettings.audioBitrate
-      this.videoFrameRate = this.videoSettings.videoFrameRate
-      this.userAgent = this.userAgent
-      this.videoChoice = this.videoSettings.videoChoice
-      this.audioChoice = this.audioSettings.audioChoice
-      console.log('From startPublisher ', this.wsURL)
-
-      console.log(
-        'startPublisher: wsURL:' +
-          this.wsURL +
-          ' streamInfo:' +
-          JSON.stringify(this.streamInfo)
-      )
-
-      this.wsConnect(this.wsURL)
-
-      // $("#buttonGo").attr('value', GO_BUTTON_STOP);
-    },
-
-    stopPublisher() {
-      if (this.peerConnection != null) this.peerConnection.close()
-      this.peerConnection = null
-
-      if (this.wsConnection != null) this.wsConnection.close()
-      this.wsConnection = null
-
-      // $("#buttonGo").attr('value', GO_BUTTON_START);
-
-      console.log('stopPublisher')
-    },
-
-    startStream() {
-      if (this.peerConnection == null) this.startPublisher()
-      else this.stopPublisher()
-    },
-    // startStream() {
-    //   this.wsConnect()
-    // },
 
     wsConnect(url) {
       this.wsConnection = new WebSocket(this.wsURL)
@@ -254,7 +211,9 @@ export default {
         let msgJSON = JSON.parse(evt.data)
 
         let msgStatus = Number(msgJSON['status'])
+        console.log('MsgJSON: ', msgStatus)
         let msgCommand = msgJSON['command']
+        console.log('MsgJSON command: ', msgCommand)
 
         if (msgStatus != 200) {
           this.elementText.sdpDataTag = msgJSON['statusDescription']
@@ -268,7 +227,7 @@ export default {
 
             this.peerConnection
               .setRemoteDescription(new RTCSessionDescription(sdpData))
-              .catch(errorHandler)
+              .catch(this.errorHandler)
           }
 
           let iceCandidates = msgJSON['iceCandidates']
@@ -298,6 +257,93 @@ export default {
           'WebSocket connection failed: ' + this.wsURL
         this.stopPublisher()
       }
+    },
+
+    startPublisher() {
+      this.wsURL
+      this.streamInfo.applicationName
+      this.streamInfo.streamName
+      this.audioSettings.audioBitrate
+      this.audioSettings.audioChoice
+      this.videoSettings.videoBitrate
+      this.videoSettings.videoChoice
+      this.videoSettings.videoFrameRate
+      this.userAgent
+
+      console.log(
+        'startPublisher: wsURL:' +
+          this.wsURL +
+          ' streamInfo:' +
+          JSON.stringify(this.streamInfo)
+      )
+
+      this.wsConnect(this.wsURL)
+      // $("#buttonGo").attr('value', GO_BUTTON_STOP);
+    },
+
+    stopPublisher() {
+      if (this.peerConnection != null) this.peerConnection.close()
+      this.peerConnection = null
+
+      if (this.wsConnection != null) this.wsConnection.close()
+      this.wsConnection = null
+      // $("#buttonGo").attr('value', GO_BUTTON_START);
+      console.log('stopPublisher')
+    },
+
+    startStream() {
+      if (this.peerConnection == null) this.startPublisher()
+      else this.stopPublisher()
+    },
+
+    gotIceCandidate(event) {
+      if (event.candidate != null) {
+        console.log(
+          'gotIceCandidate: ' +
+            JSON.stringify({
+              ice: event.candidate
+            })
+        )
+      }
+    },
+
+    gotDescription(description) {
+      let enhanceData = new Object()
+
+      if (this.audioSettings.audioBitrate !== undefined)
+        enhanceData.audioBitrate = Number(this.audioSettings.audioBitrate)
+      if (this.videoSettings.videoBitrate !== undefined)
+        enhanceData.videoBitrate = Number(this.videoSettings.videoBitrate)
+      if (this.videoSettings.videoFrameRate !== undefined)
+        enhanceData.videoFrameRate = Number(this.videoSettings.videoFrameRate)
+
+      description.sdp = this.enhanceSDP(description.sdp, enhanceData)
+
+      console.log(
+        'gotDescription: ' +
+          JSON.stringify({
+            sdp: description
+          })
+      )
+
+      return this.peerConnection
+        .setLocalDescription(description)
+        .then(() => {
+          console.log('Descrição: ', description)
+          this.wsConnection.send(
+            '{"direction":"publish", "command":"sendOffer", "streamInfo":' +
+              JSON.stringify(this.streamInfo) +
+              ', "sdp":' +
+              JSON.stringify(description) +
+              ', "userData":' +
+              JSON.stringify(this.userData) +
+              '}'
+          )
+        })
+        .catch(err => {
+          console.log('Set local description error:')
+          console.log(err)
+        })
     },
 
     addAudio(sdpStr, audioLine) {
@@ -376,55 +422,6 @@ export default {
       return sdpStrRet
     },
 
-    gotIceCandidate(event) {
-      if (event.candidate != null) {
-        console.log(
-          'gotIceCandidate: ' +
-            JSON.stringify({
-              ice: event.candidate
-            })
-        )
-      }
-    },
-
-    gotDescription(description) {
-      let enhanceData = new Object()
-
-      if (audioBitrate !== undefined)
-        enhanceData.audioBitrate = Number(this.audioSettings.audioBitrate)
-      if (videoBitrate !== undefined)
-        enhanceData.videoBitrate = Number(this.videoSettings.videoBitrate)
-      if (videoFrameRate !== undefined)
-        enhanceData.videoFrameRate = Number(this.videoSettings.videoFrameRate)
-
-      description.sdp = this.enhanceSDP(description.sdp, enhanceData)
-
-      console.log(
-        'gotDescription: ' +
-          JSON.stringify({
-            sdp: description
-          })
-      )
-
-      return peerConnection
-        .setLocalDescription(description)
-        .then(() => {
-          this.wsConnection.send(
-            '{"direction":"publish", "command":"sendOffer", "streamInfo":' +
-              JSON.stringify(streamInfo) +
-              ', "sdp":' +
-              JSON.stringify(description) +
-              ', "userData":' +
-              JSON.stringify(userData) +
-              '}'
-          )
-        })
-        .catch(err => {
-          console.log('Set local description error:')
-          console.log(err)
-        })
-    },
-
     enhanceSDP(sdpStr, enhanceData) {
       let sdpLines = sdpStr.split(/\r\n/)
       let sdpSection = 'header'
@@ -450,22 +447,29 @@ export default {
         }
         sdpStrRet = this.addAudio(
           sdpStrRet,
-          deliverCheckLine(this.audioSettings.audioChoice, 'audio')
+          this.deliverCheckLine(this.audioSettings.audioChoice, 'audio')
         )
         sdpStrRet = this.addVideo(
           sdpStrRet,
-          deliverCheckLine(this.videoSettings.videoChoice, 'video')
+          this.deliverCheckLine(this.videoSettings.videoChoice, 'video')
         )
         sdpStr = sdpStrRet
         sdpLines = sdpStr.split(/\r\n/)
         sdpStrRet = ''
       }
+      console.log(this.audioSettings.audioIndex)
+      console.log(this.videoSettings.videoIndex)
+      console.log(sdpLines)
 
       for (let sdpLine of sdpLines) {
         if (sdpLine.length <= 0) continue
 
-        if (sdpLine.indexOf('m=audio') == 0 && audioIndex != -1) {
-          audioMLines = sdpLine.split(' ')
+        if (
+          sdpLine.indexOf('m=audio') == 0 &&
+          this.audioSettings.audioIndex != -1
+        ) {
+          console.log(sdpLine)
+          let audioMLines = sdpLine.split(' ')
           sdpStrRet +=
             audioMLines[0] +
             ' ' +
@@ -473,9 +477,13 @@ export default {
             ' ' +
             audioMLines[2] +
             ' ' +
-            audioIndex
-        } else if (sdpLine.indexOf('m=video') == 0 && videoIndex != -1) {
-          audioMLines = sdpLine.split(' ')
+            this.audioSettings.audioIndex
+          console.log(audioMLines)
+        } else if (
+          sdpLine.indexOf('m=video') == 0 &&
+          this.videoSettings.videoIndex != -1
+        ) {
+          let audioMLines = sdpLine.split(' ')
           sdpStrRet +=
             audioMLines[0] +
             ' ' +
@@ -483,7 +491,7 @@ export default {
             ' ' +
             audioMLines[2] +
             ' ' +
-            videoIndex
+            this.videoSettings.videoIndex
         } else {
           sdpStrRet += sdpLine
         }
@@ -520,10 +528,10 @@ export default {
               }
               hitMID = true
             } else if ('bandwidth'.localeCompare(sdpSection) == 0) {
-              var rtpmapID
-              rtpmapID = getrtpMapID(sdpLine)
+              let rtpmapID
+              rtpmapID = this.getrtpMapID(sdpLine)
               if (rtpmapID !== null) {
-                var match = rtpmapID[2].toLowerCase()
+                let match = rtpmapID[2].toLowerCase()
                 if (
                   'vp9'.localeCompare(match) == 0 ||
                   'vp8'.localeCompare(match) == 0 ||
@@ -571,7 +579,53 @@ export default {
       return sdpStrRet
     },
 
-    // Perform checkings for the SDP protocol
+    // Checks the deliver SDP output
+    deliverCheckLine(profile, type) {
+      let outputString = ''
+      for (let line in this.SDPOutput) {
+        let lineInUse = this.SDPOutput[line]
+        outputString += line
+        if (lineInUse.includes(profile)) {
+          if (profile.includes('VP9') || profile.includes('VP8')) {
+            let output = ''
+            let outputs = lineInUse.split(/\r\n/)
+            for (let position in outputs) {
+              let transport = outputs[position]
+              if (
+                transport.indexOf('transport-cc') !== -1 ||
+                transport.indexOf('goog-remb') !== -1 ||
+                transport.indexOf('nack') !== -1
+              ) {
+                continue
+              }
+              output += transport
+              output += '\r\n'
+            }
+
+            if (type.includes('audio')) {
+              this.audioSettings.audioIndex = line
+            }
+
+            if (type.includes('video')) {
+              this.videoSettings.videoIndex = line
+            }
+
+            return output
+          }
+          if (type.includes('audio')) {
+            this.audioSettings.audioIndex = line
+          }
+
+          if (type.includes('video')) {
+            this.videoSettings.videoIndex = line
+          }
+          return lineInUse
+        }
+      }
+      return outputString
+    },
+
+    // Perform for the protocol Real time transport, etc..
     // map from an RTP payload type number to a media encoding name that identifies the payload format
     checkLine(line) {
       if (
@@ -585,19 +639,25 @@ export default {
           let number = res[1].split(' ')
           if (!isNaN(number[0])) {
             if (!number[1].startsWith('http') && !number[1].startsWith('ur')) {
-              let currentString = SDPOutput[number[0]]
+              let currentString = this.SDPOutput[number[0]]
               if (!currentString) {
                 currentString = ''
               }
               currentString += line + '\r\n'
-              SDPOutput[number[0]] = currentString
+              this.SDPOutput[number[0]] = currentString
               return false
             }
           }
         }
       }
-
       return true
+    },
+
+    // Checks for the rtpmapID in the SDP protocol (i.e.: a=rtpmap:0 PCMU/8000)
+    getrtpMapID(line) {
+      let findid = new RegExp('a=rtpmap:(\\d+) (\\w+)/(\\d+)')
+      let found = line.match(findid)
+      return found && found.length >= 3 ? found : null
     },
 
     errorHandler(error) {
@@ -623,6 +683,7 @@ export default {
         console.table(devices)
         this.device = devices[0].label
       }
+      this.getUserAgent
     })
     // console.log('Cameras found:', videoCameras)
   }
@@ -642,6 +703,10 @@ img, video {
 
 .video-container {
   margin: 2rem auto;
+
+  video {
+    z-index: 0;
+  }
 }
 
 .userChoices {
