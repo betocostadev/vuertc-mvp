@@ -720,29 +720,29 @@ export default {
 <style lang="stylus">
 .buttons {
   button {
-    margin: 0.25rem;
+    margin 0.25rem
   }
 }
 
 img, video {
-  max-width: 100%;
+  max-width 100%
 }
 
 .video-container {
-  margin: 2rem auto;
+  margin 2rem auto
 
   video {
-    z-index: 0;
+    z-index 0
   }
 }
 
 .userChoices {
-  margin: 1rem;
-  text-align: left;
+  margin 1rem
+  text-align left
 
   label {
-    font-weight: bold;
-    padding: 1rem;
+    font-weight bold
+    padding 1rem
   }
 }
 </style>
