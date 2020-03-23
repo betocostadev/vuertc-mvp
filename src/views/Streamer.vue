@@ -128,11 +128,11 @@ export default {
       peerConnectionConfig: {
         iceServers: []
       },
-      wsURL: 'wss://0afcf2.entrypoint.cloud.wowza.com/webrtc-session.json',
+      wsURL: 'wss://81b9b2.entrypoint.cloud.wowza.com/webrtc-session.json',
       wsConnection: null,
       streamInfo: {
-        applicationName: 'app-7e04',
-        streamName: 'Skkvai9K',
+        applicationName: 'app-b684',
+        streamName: 'eUpGL09h',
         sessionId: '[empty]'
       },
       userData: {
