@@ -1,7 +1,7 @@
 <template>
   <div class="streamer">
     <h1>Vue WebRTC - Streaming test</h1>
-    <div class="userChoices">
+    <div v-if="choicesEnabled" class="userChoices">
       <div>
         <label for="sdpURL">WS (SDP) URL:</label>
         <input type="text" id="sdpURL" size="50" v-model="wsURL" />
@@ -75,16 +75,22 @@
     </div>
 
     <div class="buttons">
-      <button @click="startCapture">Start capture device</button>
-      <button v-show="localStream" @click="startStream">Start stream</button>
+      <button class="link" @click="startCapture">Start capture device</button>
+      <button class="link" v-show="localStream" @click="startStream">
+        Start stream
+      </button>
     </div>
 
     <div class="status">
       <p>Capture device: {{ device }}</p>
-      <span v-if="!hasMediaDevice">Media device: off |</span>
-      <span v-else>Media device: on |</span>
-      <span v-if="!isLocalVideoPlaying">Local video: off</span>
-      <span v-else>Local video: on</span>
+      <span v-if="!hasMediaDevice"
+        >Media device: <i class="material-icons"> videocam_off </i></span
+      >
+      <span v-else>Media device: <i class="material-icons"> videocam </i></span>
+      <span v-if="!isLocalVideoPlaying"
+        >Local video: <i class="material-icons"> videocam_off </i></span
+      >
+      <span v-else>Local video: <i class="material-icons"> videocam </i></span>
     </div>
 
     <section class="video-container">
@@ -109,12 +115,12 @@
 
 <script>
 // @ is an alias to /src
-// import HelloWorld from '@/components/HelloWorld.vue'
 
 export default {
   name: 'Streamer',
   data() {
     return {
+      choicesEnabled: false,
       elementText: {
         sdpDataTag: null
       },
@@ -721,6 +727,15 @@ export default {
 .buttons {
   button {
     margin 0.25rem
+  }
+}
+
+.status {
+  span {
+    margin-right: 0.25rem
+    i {
+      vertical-align bottom
+    }
   }
 }
 

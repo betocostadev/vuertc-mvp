@@ -1,7 +1,7 @@
 <template>
   <div class="peers">
     <h1>Watch streaming</h1>
-    <button @click="play">Play video</button>
+    <button class="link" @click="play">Play video</button>
     <div class="video-container">
       <video
         ref="videoEl"
@@ -50,6 +50,6 @@ export default {
 
 <style lang="stylus">
 .video-container {
-  width 85
+  width 100
 }
 </style>
